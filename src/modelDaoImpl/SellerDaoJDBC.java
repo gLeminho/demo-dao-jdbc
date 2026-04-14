@@ -1,5 +1,6 @@
 package modelDaoImpl;
 
+import java.sql.Statement;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -26,20 +27,94 @@ public class SellerDaoJDBC implements SellerDao {
 
     @Override
     public void insert(Seller obj) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'insert'");
+        PreparedStatement st = null;
+
+        try {
+
+            st = conn.prepareStatement("INSERT INTO seller "
+                    + "(Name,Email,BirthDate,BaseSalary,DepartmentId) "
+                    + "VALUES "
+                    + "(?,?,?,?,?)",
+                    Statement.RETURN_GENERATED_KEYS);
+
+            st.setString(1, obj.getName());
+            st.setString(2, obj.getEmail());
+            st.setObject(3, obj.getBirthDate());
+            st.setDouble(4, obj.getBaseSalary());
+            st.setInt(5, obj.getDepartment().getId());
+
+            int rowsAffected = st.executeUpdate();
+
+            if (rowsAffected > 0) {
+                ResultSet rs = st.getGeneratedKeys();
+                if (rs.next()) {
+                    int id = rs.getInt(1);
+                    obj.setId(id);
+                }
+                DB.closeResultSet(rs);
+            } else {
+                throw new DbException("No rows Affected");
+            }
+
+        } catch (SQLException e) {
+            throw new DbException(e.getMessage());
+        } finally {
+            DB.closeStatments(st);
+        }
     }
 
     @Override
     public void update(Seller obj) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'update'");
+        PreparedStatement st = null;
+
+        try {
+
+            st = conn.prepareStatement("UPDATE seller " +
+                    "SET Name = ?, Email = ?, BirthDate = ?, BaseSalary = ?, DepartmentId = ? " +
+                    "WHERE Id = ?");
+
+            st.setString(1, obj.getName());
+            st.setString(2, obj.getEmail());
+            st.setObject(3, obj.getBirthDate());
+            st.setDouble(4, obj.getBaseSalary());
+            st.setInt(5, obj.getDepartment().getId());
+            st.setInt(6, obj.getId());
+
+            int rowsAffected = st.executeUpdate();
+
+            if (rowsAffected < 0) {
+                throw new DbException("Nenhuma linha foi alterada");
+            }
+
+        } catch (SQLException e) {
+            throw new DbException(e.getMessage());
+        } finally {
+            DB.closeStatments(st);
+        }
     }
 
     @Override
     public void deleteById(Integer id) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'deleteById'");
+        PreparedStatement st = null;
+
+        try {
+
+            st = conn.prepareStatement("DELETE FROM seller "
+                    + "WHERE Id = ?");
+
+            st.setInt(1, id);
+
+            int rowsAffected = st.executeUpdate();
+
+            if (rowsAffected == 0) {
+                throw new DbException("Inexistente id: "+id);
+            }
+
+        } catch (SQLException e) {
+            throw new DbException(e.getMessage());
+        } finally {
+            DB.closeStatments(st);
+        }
     }
 
     @Override
@@ -87,8 +162,33 @@ public class SellerDaoJDBC implements SellerDao {
 
     @Override
     public List<Seller> findAll() {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'findAll'");
+        PreparedStatement st = null;
+        ResultSet rs = null;
+
+        try {
+            st = conn.prepareStatement("SELECT seller.*, department.Name as DepName "
+                    + "FROM seller INNER JOIN department "
+                    + "ON seller.DepartmentId = department.Id "
+                    + "ORDER BY Name");
+
+            rs = st.executeQuery();
+
+            List<Seller> seller = new ArrayList<>();
+            Map<Integer, Department> map = new HashMap<>();
+
+            while (rs.next()) {
+                Department dep = map.get(rs.getInt("departmentId"));
+                if (dep == null) {
+                    dep = instanciateDepartment(rs);
+                    map.put(rs.getInt("departmentId"), dep);
+                }
+
+                seller.add(instanciateSeller(rs, dep));
+            }
+            return seller;
+        } catch (SQLException e) {
+            throw new DbException(e.getMessage());
+        }
     }
 
     @Override
